@@ -17,6 +17,8 @@
 //
 // Also Moe Wheatley's PSKcore documentation and filter taps.
 //
+// by Robert Morris, AB1HL.
+//
 
 //
 // adjustable parameters.

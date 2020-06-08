@@ -57,3 +57,5 @@ that signal. Send by typing; your text will show up on the lines
 starting with ">". Type control-C or control-X to quit. The file
 qso-trace.txt will contain the text of signals you have selected with
 control-A.
+
+Robert Morris, AB1HL
