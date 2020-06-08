@@ -1,18 +1,22 @@
 # pskons
 
-This is a PSK31 program suitable for running in a Linux, MacOS, or
-FreeBSD terminal (text) window.
+This is a PSK31 program suitable for running in text-only terminal
+window on Linux, MacOS, or FreeBSD.
 
 It requires that fftw3, sndfile, and portaudio libraries already
 be installed. To compile:
 
+```
   make
+```
 
 To run, attaching to sound card number X:
 
+```
   ./pskons -card X -out X
+```
 
-To find the numbers of sound card, run pskons without arguments.
+To find the numbers of sound cards, run pskons without arguments.
 
 You should see something like this in your terminal window:
 
@@ -42,11 +46,14 @@ You should see something like this in your terminal window:
   >   
 ```
 
-The lines starting with A-K are a Digipan-like display of the most
-plausible signals (typically mostly not signals at all). You can
-select one of these signals to talk to with control-A followed by the
-(lower case) letter of the signal. Then the lines starting with "-"
-will show received text from that signal. Send by typing; your text
-will show up on the lines starting with ">". Type control-C or
-control-X to quit. The file qso-trace.txt will contain the text of
-signals you have selected with control-A.
+The lines starting with upper-case letters are a Digipan-like display
+of the most plausible signals; the first number is the frequency (Hz),
+the second number (e.g. 0.9) is a indication of signal quality. Pskons
+doesn't try hard to suppress garbage, so often (as above) most of the
+lines aren't really signals. You can select one of these signals to
+talk to with control-A followed by the (lower case) letter of the
+signal. Then the lines starting with "-" will show received text from
+that signal. Send by typing; your text will show up on the lines
+starting with ">". Type control-C or control-X to quit. The file
+qso-trace.txt will contain the text of signals you have selected with
+control-A.
