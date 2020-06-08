@@ -16,7 +16,7 @@ To find the numbers of sound card, run pskons without arguments.
 
 You should see something like this in your terminal window:
 
-`
+```
   RX 1500  
   A 1605 0.9 9xc     How copy? BTU Fred Smith, 3D6P de CE1AQ pse kn   
   B  812 0.6 ear Samantha t r efort (RSQ) : 5 599 EFD*:fB  S/uomy dB1N   b  
@@ -40,7 +40,7 @@ You should see something like this in your terminal window:
   >   
   >   
   >   
-`
+```
 
 The lines starting with A-K are a Digipan-like display of the most
 plausible signals (typically mostly not signals at all). You can
