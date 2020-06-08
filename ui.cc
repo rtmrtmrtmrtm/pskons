@@ -158,8 +158,6 @@ draw_screen()
   printf("\033[H");  // home
   printf("\033[2J"); // clear
 
-  printf("%4d ", nsignals);
-
   if(transmitting){
     printf("TX ");
   } else {
