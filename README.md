@@ -1,9 +1,9 @@
 # pskons
 
-This is a PSK31 program suitable for running in text-only terminal
+This is a PSK31 program suitable for running in a text-only terminal
 window on Linux, MacOS, or FreeBSD.
 
-It requires that fftw3, sndfile, and portaudio libraries already
+It requires fftw3, sndfile, and portaudio libraries to already
 be installed. To compile:
 
 ```
