@@ -9,9 +9,6 @@ SRC = ui.cc util.cc demod.cc fft.cc snd.cc taps.cc bench.cc mod.cc
 pskons: $(SRC) demod.h fft.h snd.h util.h bench.h 
 	$(CXX) $(FLAGS) $(SRC) -o pskons $(LIBS) -pthread
 
-db: $(SRC) demod.h fft.h
-	$(CXX) -g -fsanitize=address $(FLAGS) $(SRC) -o db $(LIBS) -pthread
-
 clean:
-	rm -f pskons db
+	rm -f pskons 
 
