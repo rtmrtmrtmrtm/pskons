@@ -1,10 +1,5 @@
 
-CXX = clang++ -O 
-# CXX = g++-mp-10 -O
-# CXX += -g -fsanitize=address
-CXX += -Wall
-
-# CXX = g++9 -O3
+CXX = c++ -O 
 
 FLAGS = -std=c++17 -I/opt/local/include -I/usr/local/include
 LIBS = -L/opt/local/lib -L/usr/local/lib -lfftw3 -lsndfile -lportaudio
