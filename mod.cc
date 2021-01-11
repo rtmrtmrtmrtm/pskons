@@ -56,7 +56,7 @@ public:
 // includes raised-cosine low-pass transmit filter.
 //
 std::vector<double>
-bits2psk(const std::vector<int> &bits, double hz, int rate, int starting, int ending)
+old_bits2psk(const std::vector<int> &bits, double hz, int rate, int starting, int ending)
 {
   static double last_phase = 1;
 
@@ -114,6 +114,78 @@ bits2psk(const std::vector<int> &bits, double hz, int rate, int starting, int en
   static Filter *ff = 0;
   if(ff == 0){
     ff = new Filter(raised_cosine(round(rate / 31.25)));
+  }
+  std::vector<double> shaped_phases = ff->go(phases);
+
+  std::vector<double> samples;
+  static double theta = 0.0;
+  for(int i = 0; i < shaped_phases.size(); i++){
+    double x = shaped_phases[i] * cos(theta);
+    samples.push_back(x);
+    theta += 2 * M_PI / (rate / hz);
+    if(theta >= 2 * M_PI)
+      theta -= 2 * M_PI;
+  }
+
+  return samples;
+}
+
+std::vector<double>
+bits2psk(const std::vector<int> &bits, double hz, int rate, int starting, int ending)
+{
+  static double last_phase = 1;
+
+  int nsym = bits.size() + (starting ? 2 : 0) + (ending ? 1 : 0);
+  int block = round(rate / 31.25);
+
+  //
+  // an impulse in the middle of each symbol time;
+  // the impulse is the phase (-1 or +1).
+  //
+  std::vector<double> phases(nsym * block);
+
+  int ind = block / 2; // where next impulse should go in phases[].
+
+  if(starting){
+    //
+    // start with zero-amplitude signal to start w/o click.
+    //
+    phases[ind] = 0;
+    ind += block;
+
+    //
+    // now a dummy symbol as reference for phase changes.
+    //
+    phases[ind] = last_phase;
+    ind += block;
+  }
+  
+  for(int i = 0; i < bits.size(); i++){
+    // 1-bit leave phase unchanged.
+    // 0-bit swaps the phases.
+    double this_phase = bits[i] ? last_phase : -last_phase;
+
+    phases[ind] = this_phase;
+    ind += block;
+
+    last_phase = this_phase;
+  }
+
+  if(ending){
+    //
+    // and fade to nothing at end to avoid a click.
+    //
+    phases[ind] = 0;
+    ind += block;
+  }
+
+  //
+  // transmit shaping filter on the phases.
+  // filter length is *twice* the symbol time.
+  //
+  static Filter *ff = 0;
+  if(ff == 0){
+    ff = new Filter(raised_cosine(round(2 * rate / 31.25)));
   }
   std::vector<double> shaped_phases = ff->go(phases);
 
