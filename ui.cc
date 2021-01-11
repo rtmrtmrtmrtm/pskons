@@ -1,3 +1,4 @@
+#include "snd.h"
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -8,11 +9,9 @@
 #include <list>
 #include <thread>
 #include <algorithm>
-#include <liquid/liquid.h>
 #include <complex>
 #include "util.h"
 #include "demod.h"
-#include "snd.h"
 #include <string>
 #include <math.h>
 #include <assert.h>
@@ -28,11 +27,11 @@ usage()
   fprintf(stderr, "Usage: pskons [-only hz] -file files...\n");
   fprintf(stderr, "       pskons -opt\n");
   fprintf(stderr, "       pskons -bench\n");
-  fprintf(stderr, "       pskons -card X [-out Y]\n");
+  fprintf(stderr, "       pskons -card X Y [-out Z]\n");
   fprintf(stderr, "       pskons -cardfile xxx.wav\n");
-  fprintf(stderr, "       pskons -levels X\n");
+  fprintf(stderr, "       pskons -levels card channel\n");
   fprintf(stderr, "       pskons -gen file hz text\n");
-  snd_list();
+  fprintf(stderr, "       ft8mon -list\n");
   exit(1);
 }
 
@@ -97,10 +96,10 @@ simplify(std::string s)
 
 //
 // prints exactly n lines, the last n lines of s.
-// does not print the final newline!
+// does not print the final newline.
 //
 void
-print_n(const char *prefix, std::string s, int n, int cols)
+print_n(const char *prefix, std::string s, int n, int cols, bool suppress_final_empty)
 {
   std::vector<std::string> rxlines;
   std::string line;
@@ -111,11 +110,12 @@ print_n(const char *prefix, std::string s, int n, int cols)
         line = "";
       }
     } else {
-      line.push_back(s[i]);
+      int c = s[i];
+      line.push_back(c);
     }
   }
   int i0 = rxlines.size() - n + 1;
-  if(line.size() == 0)
+  if(line.size() == 0 && suppress_final_empty)
     i0 -= 1;
   if(i0 < 0)
     i0 = 0;
@@ -124,7 +124,7 @@ print_n(const char *prefix, std::string s, int n, int cols)
     printf("%s", prefix);
     if(i0 < rxlines.size()){
       printf("%s", rxlines[i0].c_str());
-    } else if(i0 == rxlines.size() && line.size() > 0){
+    } else if(i0 == rxlines.size() && (!suppress_final_empty || line.size() > 0)){
       printf("%s", line.c_str());
     }
     i0++;
@@ -157,6 +157,8 @@ draw_screen()
   // clear screen
   printf("\033[H");  // home
   printf("\033[2J"); // clear
+
+  printf("%4d ", nsignals);
 
   if(transmitting){
     printf("TX ");
@@ -201,14 +203,14 @@ draw_screen()
   std::string s = rx_buf;
   rx_buf_mu.unlock();
   s = simplify(s);
-  print_n("- ", s, lay.rx_rows, lay.cols-1);
+  print_n("- ", s, lay.rx_rows, lay.cols-1, true);
   printf("\n");
 
   // my transmitted text, if any.
   tx_buf_mu.lock();
   std::string tmp = tx_buf;
   tx_buf_mu.unlock();
-  print_n("> ", tmp, lay.tx_rows, lay.cols-1);
+  print_n("> ", tmp, lay.tx_rows, lay.cols-1, false);
   
   fflush(stdout);
 }
@@ -267,15 +269,23 @@ kb_loop(Demod *dm)
       lines_mu.unlock();
 
       state = -1;
-    } else if(c == '\010' || c == '\177'){
-      tx_buf_mu.lock();
-      if(tx_buf.size() > 0 && transmitting){
-        tx_buf.pop_back();
-      }
-      tx_buf_mu.unlock();
     } else {
       tx_buf_mu.lock();
-      tx_buf.push_back((char)c);
+      if(c == '\010' || c == '\177'){
+        // backspace
+        if(transmitting && tx_buf.size() > 0 && tx_buf.back() != '\010'){
+          // forget most recent pending char.
+          tx_buf.pop_back();
+        } else {
+          // send \010
+          tx_buf.push_back('\010');
+        }
+      } else if(c == '\024'){
+        // ^T -- send one second of test tone
+        tx_buf.push_back((char)128);
+      } else {
+        tx_buf.push_back((char)c);
+      }
       tx_buf_mu.unlock();
     }
   }
@@ -284,7 +294,7 @@ kb_loop(Demod *dm)
 void
 tx_loop(SoundOut *sout)
 {
-  int tx_i = 0; // how far we've gotten in tx_buf[].
+  int tx_i = tx_buf.size(); // how far we've gotten in tx_buf[].
   double session_start; // of this continuous transmission
   double session_samples;
 
@@ -295,6 +305,7 @@ tx_loop(SoundOut *sout)
     tx_buf_mu.lock();
     if(tx_buf.size() > tx_i){
       c = tx_buf[tx_i];
+      c &= 0xff;
       c_valid = true;
       tx_i++;
     }
@@ -316,7 +327,13 @@ tx_loop(SoundOut *sout)
         }
       }
 
-      if(c_valid){
+      if(c_valid && c == 128){
+        // send test tone of reversals, for e.g. IMD measurement.
+        // triggered by keyboard ^T.
+        for(int i = 0; i < 32; i++){
+          bits.push_back(0);
+        }
+      } else if(c_valid){
         const char *bbb = 0;
         for(int j = 0; varicode[j].c; j++){
           if(varicode[j].c[0] == c){
@@ -331,7 +348,7 @@ tx_loop(SoundOut *sout)
             bits.push_back(bbb[i] == '0' ? 0 : 1);
           }
         } else {
-          printf(" <oops %c> ", c); fflush(stdout);
+          printf(" <oops1 0x%02x> ", c); fflush(stdout);
         }
       }
             
@@ -356,8 +373,18 @@ tx_loop(SoundOut *sout)
 
         std::vector<short int> shorts;
         for(int i = 0; i < samples.size(); i++){
-          short int x = samples[i] * 0.44 * 32767;
-          shorts.push_back(x);
+          double x = samples[i];
+
+          // the raised_cosine() filter seems to generate
+          // amplitudes of no more than +/- 0.004
+          assert(x >= -0.004 && x <= 0.004);
+
+          x *= 250; // bring back to roughly -1 .. 1
+          
+          x *= 0.44; // K3S, freebsd, the way I have it set up
+
+          short s = x * 32767;
+          shorts.push_back(s);
         }
 
         // emit on sound card.
@@ -398,7 +425,7 @@ rx_loop(SoundIn *sin, Demod *dm)
 
   while(1){
     double xxx;
-    std::vector<double> v = sin->get(1024, xxx);
+    std::vector<double> v = sin->get(1024, xxx, 0);
 
 #if 0
     sf_write_double(f, v.data(), v.size());
@@ -452,6 +479,14 @@ screen_main(SoundIn *sin, SoundOut *sout)
   if(tcsetattr(0, TCSANOW, &tt) != 0){
     fprintf(stderr, "tcsetattr failed\n");
     exit(1);
+  }
+
+  // add a bunch of newlines to the tx_buf to make
+  // the initial keyboard input lines appear at
+  // the very bottom. tx_loop() won't send these.
+  for(int i = 0; i < 20; i++){
+    tx_buf.push_back(' ');
+    tx_buf.push_back('\n');
   }
 
   qso_fp = fopen("qso-trace.txt", "a");
@@ -593,7 +628,7 @@ genfile(const char *file, double hz, const char *text)
         bits.push_back(bbb[i] == '0' ? 0 : 1);
       }
     } else {
-      printf("oops '%c'\n", c);
+      printf("oops2 0x%02x\n", c);
     }
   }
 
@@ -628,7 +663,8 @@ int
 main(int argc, char *argv[])
 {
   double only = -1;
-  int incard = -1;
+  char *incard = 0;
+  char *inchan = 0;
   int outcard = -1;
   const char *cardfile = 0;
 
@@ -640,6 +676,9 @@ main(int argc, char *argv[])
     if(strcmp(argv[ai], "-opt") == 0 && ai+1 == argc){
       optimize();
       ai++;
+    } else if(strcmp(argv[ai], "-list") == 0){
+      snd_list();
+      exit(0);
     } else if(strcmp(argv[ai], "-bench") == 0 && ai+1 == argc){
       double nsig;
       benchmark(1, nsig);
@@ -672,9 +711,11 @@ main(int argc, char *argv[])
         }
         dm->got(v);
       }
-    } else if(strcmp(argv[ai], "-card") == 0 && ai+1 < argc){
+    } else if(strcmp(argv[ai], "-card") == 0 && ai+2 < argc){
       ai++;
-      incard = atoi(argv[ai]);
+      incard = argv[ai];
+      ai++;
+      inchan = argv[ai];
       ai++;
     } else if(strcmp(argv[ai], "-cardfile") == 0 && ai+1 < argc){
       ai++;
@@ -684,11 +725,10 @@ main(int argc, char *argv[])
       ai++;
       outcard = atoi(argv[ai]);
       ai++;
-    } else if(strcmp(argv[ai], "-levels") == 0 && ai+1 < argc){
-      ai++;
-      incard = atoi(argv[ai]);
-      ai++;
-      levels(incard);
+    } else if(strcmp(argv[ai], "-levels") == 0 && ai+2 < argc){
+      SoundIn *sin = SoundIn::open(argv[ai+1], argv[ai+2], 12000);
+      sin->start();
+      sin->levels();
       exit(0);
     } else if(strcmp(argv[ai], "-gen") == 0 && ai+3 < argc){
       ai++;
@@ -699,8 +739,8 @@ main(int argc, char *argv[])
     }
   }
 
-  if(incard >= 0){
-    CardSoundIn *sin = new CardSoundIn(incard);
+  if(incard != 0){
+    SoundIn *sin = SoundIn::open(incard, inchan, 8000);
     SoundOut *sout = 0;
     if(outcard >= 0){
       sout = new SoundOut(outcard);
@@ -709,7 +749,7 @@ main(int argc, char *argv[])
   }
 
   if(cardfile){
-    FileSoundIn *sin = new FileSoundIn(cardfile);
+    FileSoundIn *sin = new FileSoundIn(cardfile, 16000);
     screen_main(sin, 0);
   }
 }
