@@ -17,7 +17,7 @@
 //
 // Also Moe Wheatley's PSKcore documentation and filter taps.
 //
-// by Robert Morris, AB1HL.
+// Robert Morris, AB1HL
 //
 
 //
@@ -130,7 +130,7 @@ Demod::coarse(const std::vector<double> &samples, int i0)
 
   assert(start >= 0 && start + nn <= samples.size());
 
-  std::vector<std::complex<double>> bins = one_fft(samples, start, nn);
+  std::vector<std::complex<double>> bins = one_fft(samples, start, nn, "coarse", 0);
 
   for(ulong i = 0; i < bins.size() && i*bin_hz < max_hz; i++){
     double a = std::abs(bins[i]);
@@ -408,7 +408,7 @@ Demod::adjust_sync(const std::vector<double> &samples, Signal *s, int off)
 // frequencies.
 //
 std::vector<std::complex<double>>
-Demod::mix(const std::vector<double> a, double hz, int rate)
+Demod::mix(const std::vector<double> &a, double hz, int rate)
 {
   std::vector<std::complex<double>> out(a.size());
 
@@ -427,7 +427,7 @@ Demod::mix(const std::vector<double> a, double hz, int rate)
 // demodulate the symbol that starts at samples[off],
 // at the indicated hz. compares with phase of the
 // previous symbol.
-// q is quality, 0..1, reflects phase difference.
+// q is quality, 0 is bad, 1 is good, reflects phase difference.
 //
 void
 Demod::demod_bit(const std::vector<double> &samples, uint off,
@@ -452,39 +452,38 @@ Demod::demod_bit(const std::vector<double> &samples, uint off,
   std::vector<double> theta;
   
   for(int si = 0; si < 2; si++){
-    double xsum = 0, ysum = 0;
+    std::complex<double> sum = 0;
     int i0 = off - block_ + si*block_ + block_/2 - taps_.size()/2;
     for(int i = 0; i < taps_.size(); i++){
       if(i0+i >= 0 && i0+i < mixed.size()){
-        double xx = mixed[i0+i].real();
-        double yy = mixed[i0+i].imag();
-        xsum += xx * taps_[i];
-        ysum += yy * taps_[i];
+        sum += mixed[i0+i] * taps_[i];
       }
     }
-    theta.push_back(atan2(ysum, xsum));
+    theta.push_back(std::arg(sum));
   }
 
   // are they the same-ish phase, or different?
-  // the range is -pi .. pi
   double d = theta[1] - theta[0];
-  if(d < 0){
-    d = 0 - d;
-  }
-  if(d > M_PI){
-    d = (2 * M_PI) - d;
-  }
+
+  // make the range be -pi .. pi
+  while(d < -M_PI)
+    d += 2*M_PI;
+  while(d > M_PI)
+    d -= 2*M_PI;
+
+  // and now 0..pi
+  d = fabs(d);
 
   if(d >= M_PI/2){
     // different phase
     phase_diff = d;
     bit = 0;
-    q = (d - M_PI / 2) / (M_PI / 2);
+    q = (d - M_PI/2) / (M_PI / 2);
   } else {
     // same phase
     phase_diff = d;
     bit = 1;
-    q = 1.0 - d / (M_PI / 2);
+    q = 1.0 - (d / (M_PI / 2));
   }
 }
 
@@ -719,7 +718,7 @@ Demod::tick(Signal *s)
 
 struct varithing varicode[] = {
   { "00100", " " },
-  { "00101111111100", ""}, // back space XXX
+  { "00101111111100", "\010"}, // backspace
   { "001111100", "\n" },
   { "001110100", ""}, // line feed
   { "0011111111100", "!" },
