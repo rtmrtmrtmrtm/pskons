@@ -88,8 +88,10 @@ writetxt(std::vector<double> v, const char *filename)
 //
 // to be applied to the -1/+1 phases, not the
 // actual signal.
+// to be applied to phase impulses, not full blocks of phases.
+// n should be *twice* the symbol time.
 //
-// the coefficients sum to 1.0.
+// if normalize=true, the coefficients will sum to 1.0.
 //
 std::vector<double>
 raised_cosine(int n)
