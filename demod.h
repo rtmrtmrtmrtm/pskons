@@ -113,7 +113,7 @@ class Demod {
   void init_signal(Signal *);
   double demod3(const std::vector<std::complex<double>> &, uint off,
                 double hz, int bit1, int bit2);
-  std::vector<std::complex<double>> mix(const std::vector<double> a, double hz, int rate);
+  std::vector<std::complex<double>> mix(const std::vector<double> &a, double hz, int rate);
 
   std::vector<Signal> signals();
 
