@@ -70,8 +70,8 @@ get_layout(layout &lay)
 
   lay.rows = rows;
   lay.cols = cols;
-  lay.tx_rows = rows / 4;
-  lay.rx_rows = rows / 4;
+  lay.tx_rows = rows / 3.5;
+  lay.rx_rows = rows / 3.5;
   lay.pan_rows = rows - lay.tx_rows - lay.rx_rows - 1;
 }
 
@@ -199,18 +199,24 @@ draw_screen()
   }
 
   // the selected signal.
+  for(int i = 0; i < lay.cols-1; i++)
+    printf("-");
+  printf("\n");
   rx_buf_mu.lock();
   std::string s = rx_buf;
   rx_buf_mu.unlock();
   s = simplify(s);
-  print_n("- ", s, lay.rx_rows, lay.cols-1, true);
+  print_n("- ", s, lay.rx_rows-1, lay.cols-1, true);
   printf("\n");
 
   // my transmitted text, if any.
+  for(int i = 0; i < lay.cols-1; i++)
+    printf("-");
+  printf("\n");
   tx_buf_mu.lock();
   std::string tmp = tx_buf;
   tx_buf_mu.unlock();
-  print_n("> ", tmp, lay.tx_rows, lay.cols-1, false);
+  print_n("> ", tmp, lay.tx_rows-1, lay.cols-1, false);
   
   fflush(stdout);
 }
@@ -396,7 +402,6 @@ tx_loop(SoundOut *sout)
         while(now() < et - 0.2){
           usleep((et - now() - 0.2) * 1000000);
         }
-
       }
     } else {
       usleep(500 * 1000);
