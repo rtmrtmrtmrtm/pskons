@@ -118,10 +118,13 @@ benchmark1(const char *wavname, std::vector<double> hz, std::vector<const char *
     fclose(fp);
   
     unlink(odo);
-    char cmd[512];
+    char cmd[1024];
     sprintf(cmd, "../rtty-diff.pl %s %s > %s",
             wanted[i], odi, odo);
-    system(cmd);
+    if(system(cmd) != 0){
+      fprintf(stderr, "rtty-diff.pl failed\n");
+      exit(1);
+    }
     
     double score = 0;
     {
@@ -149,7 +152,8 @@ get_ncpus()
 #ifdef __linux__
   FILE *fp = popen("nproc", "r");
   if(fp){
-    fscanf(fp, "%d", &count);
+    int ret = fscanf(fp, "%d", &count);
+    assert(ret == 1);
     pclose(fp);
     if(count > 0)
       return count;
