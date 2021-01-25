@@ -80,7 +80,7 @@ public:
 
     std::vector<double> v;
     for(int j = 0; j < n; j++){
-      if (i_ < samples_.size()){
+      if (i_ < (int) samples_.size()){
         v.push_back(samples_[i_]);
         i_ += 1;
         t_ += 1 / (double) rate_;

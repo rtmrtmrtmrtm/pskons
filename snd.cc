@@ -111,7 +111,7 @@ SoundIn::levels()
     std::vector<double> buf = get(rate(), dummy, 0);
     if(buf.size() == 0)
       usleep(100*1000);
-    for(int i = 0; i < buf.size(); i++){
+    for(int i = 0; i < (int) buf.size(); i++){
       sum += fabs(buf[i]);
       n += 1;
       if(fabs(buf[i]) > max){
@@ -171,7 +171,7 @@ CardSoundIn::cb(const void *input,
             (int)statusFlags, (int)frameCount);
   }
 
-  for(int i = 0; i < frameCount; i++){
+  for(int i = 0; i < (int) frameCount; i++){
     if(((sin->wi_ + 1) % sin->n_) != sin->ri_){
       sin->buf_[sin->wi_] = buf[i*sin->channels_ + sin->chan_];
       sin->wi_ = (sin->wi_ + 1) % sin->n_;
@@ -230,7 +230,7 @@ CardSoundIn::get(int n, double &t0, int latest)
     t0 -= ((wi_ + n_) - ri_) * (1.0 / rate_);
   }
 
-  while(v.size() < n){
+  while((int) v.size() < n){
     if(ri_ == wi_){
       break;
     }
@@ -616,12 +616,10 @@ SoundOut::start()
 {
   snd_init();
 
-#ifdef __linux__
-  // RIGblaster only supports 44100 and 48000.
-  rate_ = 48000;
-#else
+  // in the past this has caused trouble with the RIGblaster,
+  // which might support only 44100 and 48000. but at those high
+  // rates, running the PSK31 transmit filter takes a long time!
   rate_ = 8000;
-#endif
 
   PaStreamParameters op;
   memset(&op, 0, sizeof(op));
@@ -673,7 +671,7 @@ void
 SoundOut::write(const std::vector<double> &v)
 {
   std::vector<short int> vv(v.size());
-  for(int i = 0; i < v.size(); i++){
+  for(int i = 0; i < (int) v.size(); i++){
     if(v[i] > 1.0 || v[i] < -1.0){
       fprintf(stderr, "SoundOut::write() oops %f\n", v[i]);
     }
@@ -716,8 +714,8 @@ ext_snd_read(void *thing, double *out, int maxout, double *tm)
   // and discard samples older than that!
   std::vector<double> v = sin->get(maxout, t0, 1);
 
-  assert(v.size() <= maxout);
-  for(int i = 0; i < maxout && i < v.size(); i++){
+  assert((int) v.size() <= maxout);
+  for(int i = 0; i < maxout && i < (int) v.size(); i++){
     out[i] = v[i];
   }
   *tm = t0 + v.size() * (1.0 / sin->rate()); // time of last sample.
